@@ -1,29 +1,3 @@
-/*******************************************************************
-  The control program of the Ardunio GalaxyRVR.
-  
-  Please install the SunFounder Controller APP from APP Store(iOS) or Google Play(Android).
-
-  Development test environment:
-    - Arduino IDE 2.0.3
-  Board tools:
-    - Arduino AVR Boards 1.8.3
-  Libraries:
-    - IRLremote
-    - SoftPWM
-    - ArduinoJson
-    - Sunfounder_AI_Camera
-
-  Version: 1.0.0
-    -- https://github.com/sunfounder/galaxy-rvr.git
-  
-  Documentation:
-    -- https://docs.sunfounder.com/projects/galaxy-rvr/en/latest/
-
-  Author: Sunfounder
-  Website: https://www.sunfounder.com
-           https://docs.sunfounder.com
-
-********************************************************************/
 #define VERSION "1.1.0"
 
 #include <Arduino.h>
@@ -112,7 +86,9 @@ SoftServo servo;
 /* variables of voice control */
 char voice_buf_temp[20];
 int8_t current_voice_code = -1;
-int32_t voice_time = 0; // uint:s
+// voice_time holds the duration (ms) for the current voice command;
+// -1 is used as a sentinel for "endless" action so it must be signed.
+int32_t voice_time = 0;
 uint32_t voice_start_time = 0; // uint:s
 
 /* variables of motors and servo*/
@@ -186,8 +162,9 @@ void loop() {
   aiCam.loop();
   if (aiCam.ws_connected == false) {
     currentMode = MODE_DISCONNECT;
-    int8_t current_voice_code = -1;
-    int8_t voice_time = 0;
+    // reset globals instead of redeclaring locals (avoids unused-variable warnings)
+    current_voice_code = -1;
+    voice_time = 0;
     if (currentMode != MODE_DISCONNECT) {
       rgb_blink_start_time = 0;
       rgb_blink_flag = 1;
@@ -338,9 +315,12 @@ void obstacleAvoidance() {
  */
 void voice_control() {
   if (voice_time == -1) {
+    // infinite duration
     voice_action(current_voice_code, VOICE_CONTROL_POWER);
   } else {
-    if (millis() - voice_start_time <= voice_time) {
+    uint32_t elapsed = millis() - voice_start_time;
+    // only perform the action when voice_time is non-negative and within limit
+    if (voice_time >= 0 && elapsed <= (uint32_t)voice_time) {
       voice_action(current_voice_code, VOICE_CONTROL_POWER);
     } else {
       currentMode = MODE_NONE;
